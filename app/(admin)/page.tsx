@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PrintableVoucher } from "@/components/ops/pdf-invoice";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import {
   Truck,
   MapPin,
@@ -16,6 +17,7 @@ import {
   Plus,
   Printer,
   ChevronRight,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -64,8 +66,40 @@ const initialJobs: DispatchJob[] = [
 export default function DispatchDashboard() {
   const [jobs, setJobs] = useState<DispatchJob[]>(initialJobs);
   const [selectedInvoiceJob, setSelectedInvoiceJob] = useState<DispatchJob | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // New Job form state
+  const [clientName, setClientName] = useState("");
+  const [destination, setDestination] = useState("");
+  const [operator, setOperator] = useState("Marcus Vance");
+  const [amount, setAmount] = useState("");
 
   const totalRevenueToday = jobs.reduce((sum, j) => sum + j.total_amount, 0);
+
+  const handleCreateJob = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientName.trim() || !destination.trim()) return;
+
+    const newJob: DispatchJob = {
+      id: `job-${Date.now()}`,
+      job_number: `DSP-2026-${Math.floor(100 + Math.random() * 900)}`,
+      client_id: `c-${Date.now()}`,
+      client_name: clientName.trim(),
+      client_phone: "+1 (555) 019-2831",
+      assigned_operator: operator,
+      destination: destination.trim(),
+      scheduled_date: new Date().toISOString().split("T")[0],
+      status: "dispatched",
+      total_amount: parseFloat(amount) || 1250,
+      created_at: new Date().toISOString(),
+    };
+
+    setJobs([newJob, ...jobs]);
+    setClientName("");
+    setDestination("");
+    setAmount("");
+    setIsModalOpen(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -76,11 +110,11 @@ export default function DispatchDashboard() {
             Monitor real-time field status, generate printable delivery slips, and dispatch crews.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href="/kanban">View Pipeline &rarr;</Link>
           </Button>
-          <Button size="sm" className="gap-2">
+          <Button size="sm" onClick={() => setIsModalOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" /> New Dispatch Job
           </Button>
         </div>
@@ -179,6 +213,74 @@ export default function DispatchDashboard() {
         </CardContent>
       </Card>
 
+      {/* New Dispatch Job Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-lg">Create New Dispatch Job</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateJob} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Client Name</label>
+                <Input
+                  required
+                  placeholder="e.g. Apex Civil Foundations"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Delivery Destination / Site</label>
+                <Input
+                  required
+                  placeholder="e.g. 742 Evergreen Terrace, Sector 4"
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Assign Field Operator</label>
+                <select
+                  value={operator}
+                  onChange={(e) => setOperator(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                >
+                  <option value="Marcus Vance">Marcus Vance</option>
+                  <option value="Leo Ramirez">Leo Ramirez</option>
+                  <option value="Sarah Connor">Sarah Connor</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Contract Value ($)</label>
+                <Input
+                  type="number"
+                  placeholder="1450"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1">
+                  Dispatch Crew
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Printable Voucher Modal */}
       {selectedInvoiceJob && (
         <PrintableVoucher
@@ -192,7 +294,7 @@ export default function DispatchDashboard() {
             operator: selectedInvoiceJob.assigned_operator,
             items: [
               { description: "Heavy Duty Boom Lift 45ft (Day Rental)", quantity: 1, rate: 850.0 },
-              { description: "Operator & Transport Mobilization Fee", quantity: 1, rate: selectedInvoiceJob.total_amount - 850.0 },
+              { description: "Operator & Transport Mobilization Fee", quantity: 1, rate: Math.max(100, selectedInvoiceJob.total_amount - 850.0) },
             ],
             total: selectedInvoiceJob.total_amount,
           }}
